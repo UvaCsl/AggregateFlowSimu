@@ -1,0 +1,147 @@
+load "msh3"
+load "medit"
+load "iovtk"
+
+real rho = 1.025 * 1e-3; // Density of the blood (g mm^-3)
+real miu = 3e-3; // Dynamic viscosity (g mm^-1 s^-1)
+real nu = miu / rho; // (mm^2 s^-1)
+real dia = 2e-3; // Diameter of platelets (mm)
+real spher = 0.71; // Sphericity of platelets
+
+// Read intensity
+real cpu = clock();
+real[int] l2(182292480);
+{
+    cout << "Start read data" << endl;
+    ifstream file("data/1600.txt");
+    for (int iii = 0; iii < 182292480; iii++){
+        file >> l2[iii];
+    }
+    cout << "End read data" << endl;
+}
+real RIt = clock() - cpu;
+cout << "Time for reading intensity: " << RIt << endl;
+
+func Pk = P1;
+func Pk0 = P0;
+
+// Read mesh
+cpu = clock();
+mesh3 Pla = readmesh3("mesh/platelet.mesh");
+mesh3 Mesh = readmesh3("mesh/30.mesh"); 
+// Info    : 840 edges
+// Info    : 65344 triangles
+// Info    : 1339936 tetrahedra
+
+real RMt = clock() - cpu;
+cout << "Time for reading mesh: " << RMt << endl;
+
+// ---------------------------------------------------------------------------
+
+fespace SpaceP1(Mesh, Pk); // Temperature and pressure fields
+fespace SpaceP0(Mesh, Pk0); // Permeability coefficient space
+
+fespace SpaceP1PLA(Pla, Pk);
+fespace SpaceP0PLA(Pla, Pk0); // Porosity on platelets
+
+SpaceP1PLA cpla;
+SpaceP0PLA intenpla = 0;
+SpaceP0PLA vfpla = 0;
+SpaceP0PLA kpla = 0;
+SpaceP0PLA kcoepla = 0;
+
+// Give volume factor and calculate permeability
+cpu = clock();
+// Read k values from the file and put it in a fespace function
+real coordx;
+real coordy;
+real coordz;
+for (int i = 0.; i < Pla.nt; i++){
+  coordx = round(((Pla[i][0].x + Pla[i][1].x + Pla[i][2].x + Pla[i][3].x) / 4) / 0.0454);
+  coordy = round(((Pla[i][0].y + Pla[i][1].y + Pla[i][2].y + Pla[i][3].y) / 4) / 0.0454);
+  coordz = round((Pla[i][0].z + Pla[i][1].z + Pla[i][2].z + Pla[i][3].z) / 4);
+  // if (mpirank == 0)
+  //   cout << "Element" << i << " -- coordinates: (" << coordx << ", " << coordy << ", " << coordz << ")" <<endl;
+  intenpla[](Pla[i]) = l2(coordx + coordy * 2752 + coordz * 2752 * 2208);
+}
+real RITDt = clock() - cpu;
+cout << "Time for reading the intensity to platelets: " << RITDt << endl;
+
+cpu = clock();
+for (int j = 0.; j < Pla.nt; j++)
+{
+  vfpla[](j) = 0.00137385 * intenpla[](j) + 0.27440581; // change for different shear rates
+  kpla[](j) = spher^2 * (1 - vfpla[](j))^3 * dia^2 / (150 * (vfpla[](j))^2); // Kozney-Carman
+  kcoepla[](j) = miu / kpla[](j); // Darcy (dynamic viscosity)
+}
+real CPt = clock() - cpu;
+cout << "Time for calculeting the permeability: " << CPt << endl;
+// savevtk("Mesh.vtu", Mesh, vf, k, dataname="volume_fator permeability");
+
+cout<<intenpla[].min<<" "<<intenpla[].max<<endl;
+cout<<vfpla[].min<<" "<<vfpla[].max<<endl;
+
+// int[int] Order = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+// savevtk("aggregates.vtu", Pla, intenpla, vfpla, kcoepla, kpla, dataname="intensity volume_factor coefficient permeability", order=Order);
+
+cpu = clock();
+// Interpolation
+SpaceP0 inten = 0; // Read intensity
+SpaceP0 vf = 0; // Volume factor
+SpaceP0 k = 0; // Permeability
+SpaceP0 kcoe = 0; // Darcy term coefficient
+SpaceP0 kappa = 0; // Diffusion source part coefficient
+
+SpaceP0 cx = x;
+SpaceP0 cy = y;
+SpaceP0 cz = z;
+
+real IIt = clock() - cpu;
+for (int i = 0.; i < Mesh.nt; i++)
+{
+  if (chi(Pla)(cx[][i], cy[][i], cz[][i]) == 1)
+  {
+    // inten[](i) = 1;
+    inten[](i) = intenpla(cx[][i], cy[][i], cz[][i]);
+    vf[](i) = vfpla(cx[][i], cy[][i], cz[][i]);
+    k[](i) = kpla(cx[][i], cy[][i], cz[][i]);
+    kcoe[](i) = kcoepla(cx[][i], cy[][i], cz[][i]);
+  }
+  cout << "\rProcessed: " << i << " / " << SpaceP0.ndof;
+}
+cout << "Time for interpolating: " << IIt << endl;
+
+/*inten = intenpla;
+real IIt = clock() - cpu;
+cout << "Time for interpolating intensity: " << IIt << endl;
+
+vf = vfpla;
+real IVFt = clock() - IIt;
+cout << "Time for interpolating volume fraction: " << IVFt << endl;
+
+k = kpla;
+real IKt = clock() - IVFt;
+cout << "Time for interpolating permeability: " << IKt << endl;
+
+kcoe = kcoepla;
+real IKCt = clock() - IKt;
+cout << "Time for interpolating coefficient: " << IKCt << endl;
+
+kappa = kappapla;
+real IKAt = clock() - IKCt;
+cout << "Time for interpolating kappa: " << IKAt << endl;
+*/
+
+// savesol("kappa.sol", Mesh, kappa);
+savesol("data/sol_files/kcoe.sol", Mesh, kcoe, order = 0); // order = o for P0 elements
+savesol("data/sol_files/k.sol", Mesh, k, order = 0);
+savesol("data/sol_files/vf.sol", Mesh, vf, order = 0);
+savesol("data/sol_files/inten.sol", Mesh, inten, order = 0);
+
+// savesol("sol_file_pla/kappapla.sol", Pla, kappapla);
+savesol("data/sol_files_pla/kcoepla.sol", Pla, kcoepla, order = 0);
+savesol("data/sol_files_pla/kpla.sol", Pla, kpla, order = 0);
+savesol("data/sol_files_pla/vfpla.sol", Pla, vfpla, order = 0);
+savesol("data/sol_files_pla/intenpla.sol", Pla, intenpla, order = 0);
+
+
