@@ -1,5 +1,7 @@
 # Image-based Flow Simulation of Platelet Aggregates
 
+[![DOI](https://zenodo.org/badge/yhao9s9.svg)](https://zenodo.org/badge/latestdoi/yhao9s9)
+
 This code is associated to the submission for peer review publication of "[Image-based Flow Simulation of Platelet Aggregates under Different Shear Rates](https://www.biorxiv.org/content/10.1101/2023.02.22.529480v2)". 
 
 This repository present an image-based computational model simulating blood flow through and around platelet aggregates. The microstructure of aggregates was captured by two different modalities of microscopy images of *in vitro* whole blood perfusion experiments in microfluidic chambers coated with collagen. One set of images captured the geometry of the aggregate outline, while the other employed platelet labelling to infer the internal density. The platelet aggregates were modelled as a porous medium, the permeability of which was calculated with the Kozeny-Carman equation. 
