@@ -1,6 +1,6 @@
 # Image-based Flow Simulation of Platelet Aggregates
 
-[![DOI](https://zenodo.org/badge/yhao9s9.svg)](https://zenodo.org/badge/latestdoi/yhao9s9)
+[![DOI](https://zenodo.org/badge/637938298.svg)](https://zenodo.org/badge/latestdoi/637938298)
 
 This code is associated to the submission for peer review publication of "[Image-based Flow Simulation of Platelet Aggregates under Different Shear Rates](https://www.biorxiv.org/content/10.1101/2023.02.22.529480v2)". 
 
